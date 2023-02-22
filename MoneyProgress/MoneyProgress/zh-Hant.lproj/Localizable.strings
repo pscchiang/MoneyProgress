@@ -21,13 +21,22 @@
 "invalid_time_range_tip" = "時間範圍無效";
 
 /* No comment provided by engineer. */
-"Is there a lunch break" = "是否有午休";
+"Is there a lunch break" = "是否有午餐";
 
 /* No comment provided by engineer. */
-"Lunch break ends at" = "午休結束於";
+"Lunch break ends at" = "午餐結束於";
 
 /* No comment provided by engineer. */
-"Lunch break starts at " = "午休開始於";
+"Lunch break starts at " = "午餐開始於";
+
+/* No comment provided by engineer. */
+"Is there a dinner break" = "是否有晚餐";
+
+/* No comment provided by engineer. */
+"Dinner break ends at" = "晚餐結束於";
+
+/* No comment provided by engineer. */
+"Dinner break starts at " = "晚餐開始於";
 
 /* No comment provided by engineer. */
 "money progress" = "錢條";
