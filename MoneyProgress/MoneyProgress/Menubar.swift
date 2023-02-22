@@ -8,6 +8,7 @@
 import AppKit
 import SwiftUI
 
+
 class Menubar: ObservableObject {
     static let shared = Menubar()
 
@@ -32,6 +33,15 @@ class Menubar: ObservableObject {
     @AppStorage("wiki.qaq.noonBreakEndTimeStamp")
     var noonBreakEndTimeStamp: Double = 0
 
+    @AppStorage("wiki.qaq.isHaveNightBreak")
+    var isHaveNightBreak: Bool = false
+
+    @AppStorage("wiki.qaq.nightBreakStartTimeStamp")
+    var nightBreakStartTimeStamp: Double = 0
+
+    @AppStorage("wiki.qaq.nightBreakEndTimeStamp")
+    var nightBreakEndTimeStamp: Double = 0
+    
     @AppStorage("wiki.qaq.currencyUnit")
     var currencyUnit: String = "RMB"
 
@@ -41,13 +51,15 @@ class Menubar: ObservableObject {
     @Published var menubarRunning = false
     @Published var todayPercent: Double = 0
     @Published var todayEarn: Int = 0
-
+    @Published var DateFlag = Date()
+    
+    
     var popover: NSPopover
     var statusItem: NSStatusItem?
     var eventMonitor: EventMonitor?
 
     let timer: Timer!
-
+    
     private init() {
         let buildPopover = NSPopover()
         popover = buildPopover
@@ -60,6 +72,41 @@ class Menubar: ObservableObject {
         RunLoop.current.add(timer, forMode: .common)
     }
 
+    func date2String(_ date:Date, dateFormat:String = "yyyy-MM-dd HH:mm:ss") -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.init(identifier: "zh_CN")
+        formatter.dateFormat = dateFormat
+        let date = formatter.string(from: date)
+        return date
+    }
+
+    //字符串 -> 日期
+    func string2Date(_ string:String, dateFormat:String = "yyyy-MM-dd HH:mm:ss") -> Date {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.init(identifier: "zh_CN")
+        formatter.dateFormat = dateFormat
+        let date = formatter.date(from: string)
+        return date!
+    }
+    
+    func restart(){
+        assert(Thread.isMainThread)
+        guard menubarRunning else {
+            return
+        }
+
+        let CurrentDate_string = date2String(Date(), dateFormat:"yyyy-MM-dd")
+        let CurrentDate = string2Date(CurrentDate_string, dateFormat:"yyyy-MM-dd")
+        let DateFlag_string = date2String(DateFlag, dateFormat:"yyyy-MM-dd")
+        let DateFlag_count = string2Date(DateFlag_string, dateFormat:"yyyy-MM-dd")
+        let gap = CurrentDate.timeIntervalSince(DateFlag_count)
+        if gap > 86400 {
+            DateFlag = Date()
+            stop()
+            run()
+        }
+    }
+    
     func run() {
         assert(Thread.isMainThread)
         guard !menubarRunning else {
@@ -137,7 +184,7 @@ class Menubar: ObservableObject {
         todayPercent = percent
         todayEarn = Int(todayMake)
         var title = ""
-
+        restart()
         if percent <= 0 {
             title = "Not working yet".localized
         } else if percent >= 1 {
@@ -172,6 +219,8 @@ class Menubar: ObservableObject {
         let workEndDate = Date(timeIntervalSince1970: workEnd)
         let noonBreakStartDate = Date(timeIntervalSince1970: noonBreakStartTimeStamp)
         let noonBreakEndDate = Date(timeIntervalSince1970: noonBreakEndTimeStamp)
+        let nightBreakStartDate = Date(timeIntervalSince1970: nightBreakStartTimeStamp)
+        let nightBreakEndDate = Date(timeIntervalSince1970: nightBreakEndTimeStamp)
         let nowDate = Date()
 
         var passedTimeInterval: TimeInterval = 0.0
@@ -179,10 +228,32 @@ class Menubar: ObservableObject {
         let beforeWorkStartDateFlag: Bool = timeIntervalFromWorkStartDate <= 0
         let betweenWorkStartDateAndNoonBreakStartDate: Bool = timeIntervalFromWorkStartDate > 0 && nowDate.timeIntervalSince(noonBreakStartDate) < 0
         let betweenNoonBreakStartDateAndNoonBreakEndDate: Bool = nowDate.timeIntervalSince(noonBreakStartDate) >= 0 && nowDate.timeIntervalSince(noonBreakEndDate) <= 0
-        let betweenNoonBreakEndDateAndWorkEndDate: Bool = nowDate.timeIntervalSince(noonBreakEndDate) > 0 && nowDate.timeIntervalSince(workEndDate) < 0
+        let betweenNoonBreakEndDateAndNightBreakStartDate: Bool = nowDate.timeIntervalSince(noonBreakEndDate) > 0 && nowDate.timeIntervalSince(nightBreakStartDate) < 0
+        let betweenNightBreakStartDateAndNightBreakEndDate: Bool = nowDate.timeIntervalSince(nightBreakStartDate) >= 0 && nowDate.timeIntervalSince(nightBreakEndDate) <= 0
+        let betweenNightBreakEndDateAndWorkEndDate: Bool = nowDate.timeIntervalSince(nightBreakEndDate) > 0 && nowDate.timeIntervalSince(workEndDate) < 0
         let betweenWorkStartDateAndWorkEndDate: Bool = timeIntervalFromWorkStartDate > 0 && nowDate.timeIntervalSince(workEndDate) < 0
-
-        if isHaveNoonBreak {
+        
+        let betweenWorkStartDateAndNightBreakStartDate: Bool = timeIntervalFromWorkStartDate > 0 && nowDate.timeIntervalSince(nightBreakStartDate) < 0
+        let betweenNoonBreakEndDateAndWorkEndDate: Bool = nowDate.timeIntervalSince(noonBreakEndDate) > 0 && nowDate.timeIntervalSince(workEndDate) < 0
+        
+        
+        if isHaveNoonBreak && isHaveNightBreak {
+            if beforeWorkStartDateFlag {
+                passedTimeInterval = 0.0
+            } else if betweenWorkStartDateAndNoonBreakStartDate {
+                passedTimeInterval = timeIntervalFromWorkStartDate
+            } else if betweenNoonBreakStartDateAndNoonBreakEndDate {
+                passedTimeInterval = noonBreakStartDate.timeIntervalSince(workStartDate)
+            } else if betweenNoonBreakEndDateAndNightBreakStartDate {
+                passedTimeInterval = noonBreakStartDate.timeIntervalSince(workStartDate) + nowDate.timeIntervalSince(noonBreakEndDate)
+            } else if betweenNightBreakStartDateAndNightBreakEndDate {
+                passedTimeInterval = noonBreakStartDate.timeIntervalSince(workStartDate) + nightBreakStartDate.timeIntervalSince(noonBreakEndDate)
+            } else if betweenNightBreakEndDateAndWorkEndDate {
+                passedTimeInterval = nowDate.timeIntervalSince(nightBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate) + nightBreakStartDate.timeIntervalSince(noonBreakEndDate)
+            } else {
+                passedTimeInterval = timeIntervalFromWorkStartDate
+            }
+        } else if isHaveNoonBreak && !isHaveNightBreak {
             if beforeWorkStartDateFlag {
                 passedTimeInterval = 0.0
             } else if betweenWorkStartDateAndNoonBreakStartDate {
@@ -191,6 +262,18 @@ class Menubar: ObservableObject {
                 passedTimeInterval = noonBreakStartDate.timeIntervalSince(workStartDate)
             } else if betweenNoonBreakEndDateAndWorkEndDate {
                 passedTimeInterval = nowDate.timeIntervalSince(noonBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate)
+            } else {
+                passedTimeInterval = timeIntervalFromWorkStartDate
+            }
+        } else if !isHaveNoonBreak && isHaveNightBreak {
+            if beforeWorkStartDateFlag {
+                passedTimeInterval = 0.0
+            } else if betweenWorkStartDateAndNightBreakStartDate {
+                passedTimeInterval = timeIntervalFromWorkStartDate
+            } else if betweenNightBreakStartDateAndNightBreakEndDate {
+                passedTimeInterval = nightBreakStartDate.timeIntervalSince(workStartDate)
+            } else if betweenNightBreakEndDateAndWorkEndDate {
+                passedTimeInterval = nowDate.timeIntervalSince(nightBreakEndDate) + nightBreakStartDate.timeIntervalSince(workStartDate)
             } else {
                 passedTimeInterval = timeIntervalFromWorkStartDate
             }
@@ -211,10 +294,18 @@ class Menubar: ObservableObject {
         let workEndDate = Date(timeIntervalSince1970: workEnd)
         let noonBreakStartDate = Date(timeIntervalSince1970: noonBreakStartTimeStamp)
         let noonBreakEndDate = Date(timeIntervalSince1970: noonBreakEndTimeStamp)
+        let nightBreakStartDate = Date(timeIntervalSince1970: nightBreakStartTimeStamp)
+        let nightBreakEndDate = Date(timeIntervalSince1970: nightBreakEndTimeStamp)
         var totalWorkTimeInterval: TimeInterval = 1.0
-        if isHaveNoonBreak {
+        if isHaveNoonBreak && isHaveNightBreak {
+            // interval = (workEndDate - noonBreakEndDate) + (noonBreakStartDate - workStartDate)
+            totalWorkTimeInterval = workEndDate.timeIntervalSince(nightBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate) + nightBreakStartDate.timeIntervalSince(noonBreakEndDate)
+        } else if isHaveNoonBreak && !isHaveNightBreak {
             // interval = (workEndDate - noonBreakEndDate) + (noonBreakStartDate - workStartDate)
             totalWorkTimeInterval = workEndDate.timeIntervalSince(noonBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate)
+        } else if !isHaveNoonBreak && isHaveNightBreak {
+            // interval = (workEndDate - noonBreakEndDate) + (noonBreakStartDate - workStartDate)
+            totalWorkTimeInterval = workEndDate.timeIntervalSince(nightBreakEndDate) + nightBreakStartDate.timeIntervalSince(workStartDate)
         } else {
             // interval = workEndDate - workStartDate
             totalWorkTimeInterval = workEndDate.timeIntervalSince(workStartDate)

@@ -9,6 +9,25 @@ import AppKit
 import Colorful
 import SwiftUI
 
+var DateFlag = "2022-01-01"
+
+func date2String(_ date:Date, dateFormat:String = "yyyy-MM-dd HH:mm:ss") -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale.init(identifier: "zh_CN")
+    formatter.dateFormat = dateFormat
+    let date = formatter.string(from: date)
+    return date
+}
+
+//字符串 -> 日期
+func string2Date(_ string:String, dateFormat:String = "yyyy-MM-dd HH:mm:ss") -> Date {
+    let formatter = DateFormatter()
+    formatter.locale = Locale.init(identifier: "zh_CN")
+    formatter.dateFormat = dateFormat
+    let date = formatter.date(from: string)
+    return date!
+}
+
 enum AlertType {
     case moneyCountInvalid
     case workDayInvalid
@@ -18,7 +37,8 @@ enum AlertType {
 struct ContentView: View {
     // store timestamp at 1970.1.1
     // we are using the time components only
-
+    @StateObject var menubar = Menubar.shared
+    
     @AppStorage("wiki.qaq.workStart")
     var __workStart: Double = 0
     @AppStorage("wiki.qaq.workEnd")
@@ -28,6 +48,10 @@ struct ContentView: View {
     var __noonBreakStartTimeStamp: Double = 0
     @AppStorage("wiki.qaq.noonBreakEndTimeStamp")
     var __noonBreakEndTimeStamp: Double = 0
+    @AppStorage("wiki.qaq.nightBreakStartTimeStamp")
+    var __nightBreakStartTimeStamp: Double = 0
+    @AppStorage("wiki.qaq.nightBreakEndTimeStamp")
+    var __nightBreakEndTimeStamp: Double = 0
 
     @AppStorage("wiki.qaq.monthPaid")
     var __monthPaid: Int = 3000
@@ -37,6 +61,9 @@ struct ContentView: View {
 
     @AppStorage("wiki.qaq.isHaveNoonBreak")
     var __isHaveNoonBreak: Bool = false
+    
+    @AppStorage("wiki.qaq.isHaveNightBreak")
+    var __isHaveNightBreak: Bool = false
 
     @AppStorage("wiki.qaq.compactMode")
     var compactMode: Bool = false
@@ -52,13 +79,14 @@ struct ContentView: View {
 
     @State private var noonBreakStartDate: Date = .init()
     @State private var noonBreakEndDate: Date = .init()
-
+    @State private var nightBreakStartDate: Date = .init()
+    @State private var nightBreakEndDate: Date = .init()
+    
     @State var monthPaid: Int = 0
     @State var sliderWidth: CGFloat = 0
     @State var dayWorkOfMonth: Int = 20
 
-    @StateObject var menubar = Menubar.shared
-
+    @State private var isHaveNightBreak: Bool = false
     @State private var isHaveNoonBreak: Bool = false
     @State private var isShowAlert = false
     @State private var isMoneyInvalid = false
@@ -81,6 +109,7 @@ struct ContentView: View {
                 .padding()
         }
         .animation(.interactiveSpring(), value: isHaveNoonBreak)
+        .animation(.interactiveSpring(), value: isHaveNightBreak)
         .overlay(
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -94,6 +123,8 @@ struct ContentView: View {
                     Text(text3)
                     let text4 = String(format: "You can earn %@ %@ in one second".localized, formattedCoinPerSecond, currencyUnit)
                     Text(text4)
+                    let text5 = String(format: "Today's date:".localized, date2String(menubar.DateFlag, dateFormat:"yyyy-MM-dd"))
+                    Text(text5)
                 }
                 .font(.system(.caption, design: .rounded))
                 .lineLimit(1)
@@ -124,6 +155,9 @@ struct ContentView: View {
                 workEndTimeStamp = workEndDate.timeIntervalSince1970
                 noonBreakStartDate = Date(timeIntervalSince1970: __noonBreakStartTimeStamp).movedToTodayAndKeepHMS
                 noonBreakEndDate = Date(timeIntervalSince1970: __noonBreakEndTimeStamp).movedToTodayAndKeepHMS
+                nightBreakStartDate = Date(timeIntervalSince1970: __nightBreakStartTimeStamp).movedToTodayAndKeepHMS
+                nightBreakEndDate = Date(timeIntervalSince1970: __nightBreakEndTimeStamp).movedToTodayAndKeepHMS
+                isHaveNightBreak = __isHaveNightBreak
                 monthPaid = __monthPaid
                 isHaveNoonBreak = __isHaveNoonBreak
                 currencyUnit = __currencyUnit
@@ -161,6 +195,18 @@ struct ContentView: View {
                     .timeIntervalSince1970
                 Menubar.shared.reload()
             }
+            .onChange(of: nightBreakStartDate) { newValue in
+                __nightBreakStartTimeStamp = newValue
+                    .movedToTodayAndKeepHMS
+                    .timeIntervalSince1970
+                Menubar.shared.reload()
+            }
+            .onChange(of: nightBreakEndDate) { newValue in
+                __nightBreakEndTimeStamp = newValue
+                    .movedToTodayAndKeepHMS
+                    .timeIntervalSince1970
+                Menubar.shared.reload()
+            }
             .onChange(of: monthPaid) { newValue in
                 if newValue < 0 {
                     self.isMoneyInvalid = true
@@ -185,6 +231,10 @@ struct ContentView: View {
                 __isHaveNoonBreak = newValue
                 Menubar.shared.reload()
             }
+            .onChange(of: isHaveNightBreak) { newValue in
+                __isHaveNightBreak = newValue
+                Menubar.shared.reload()
+            }
             .onChange(of: currencyUnit) { newValue in
                 __currencyUnit = newValue
                 Menubar.shared.reload()
@@ -193,12 +243,12 @@ struct ContentView: View {
 
     var coinPerSecond: Double {
         var timeInterval: TimeInterval = 1
+        timeInterval = workEndDate.timeIntervalSince(workStartDate)
         if isHaveNoonBreak {
-            // interval = (workEndDate - noonBreakEndDate) + (noonBreakStartDate - workStartDate)
-            timeInterval = workEndDate.timeIntervalSince(noonBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate)
-        } else {
-            // interval = workEndDate - workStartDate
-            timeInterval = workEndDate.timeIntervalSince(workStartDate)
+            timeInterval = timeInterval - noonBreakEndDate.timeIntervalSince(noonBreakStartDate)
+        }
+        if isHaveNightBreak {
+            timeInterval = timeInterval - nightBreakEndDate.timeIntervalSince(nightBreakStartDate)
         }
         debugPrint(timeInterval)
         return Double(monthPaid)
@@ -208,10 +258,12 @@ struct ContentView: View {
 
     var workHours: String {
         var timeInterval: TimeInterval = 0
+        timeInterval = workEndDate.timeIntervalSince(workStartDate)
         if isHaveNoonBreak {
-            timeInterval = workEndDate.timeIntervalSince(noonBreakEndDate) + noonBreakStartDate.timeIntervalSince(workStartDate)
-        } else {
-            timeInterval = workEndDate.timeIntervalSince(workStartDate)
+            timeInterval = timeInterval - noonBreakEndDate.timeIntervalSince(noonBreakStartDate)
+        }
+        if isHaveNightBreak {
+            timeInterval = timeInterval - nightBreakEndDate.timeIntervalSince(nightBreakStartDate)
         }
         let hours = timeInterval / 3600.0
         return String(format: "%.1f", hours)
@@ -424,6 +476,19 @@ struct ContentView: View {
                 }
                 .font(.system(.caption, design: .rounded))
             }
+            HStack {
+                Toggle("Is there a dinner break", isOn: $isHaveNightBreak)
+                    .toggleStyle(.checkbox)
+                Spacer()
+            }
+            if isHaveNightBreak {
+                HStack {
+                    DatePicker("Dinner break starts at ", selection: $nightBreakStartDate, displayedComponents: .hourAndMinute)
+                    Spacer()
+                    DatePicker("Dinner break ends at", selection: $nightBreakEndDate, displayedComponents: .hourAndMinute)
+                }
+                .font(.system(.caption, design: .rounded))
+            }
         }
     }
 
@@ -455,9 +520,12 @@ struct ContentView: View {
         workStartDate = getTodayDate(hour: 9) ?? date
         noonBreakStartDate = getTodayDate(hour: 12) ?? date
         noonBreakEndDate = getTodayDate(hour: 14) ?? date
+        nightBreakStartDate = getTodayDate(hour: 17) ?? date
+        nightBreakEndDate = getTodayDate(hour: 18) ?? date
         workEndTimeStamp = getTodayDate(hour: 18)?.timeIntervalSince1970 ?? 0
         workEndDate = getTodayDate(hour: 18) ?? date
         isHaveNoonBreak = false
+        isHaveNightBreak = false
         dayWorkOfMonth = 20
         currencyUnit = "CNY"
     }
@@ -517,6 +585,21 @@ struct ContentView: View {
             if workStartDate.timeIntervalSince(noonBreakStartDate) < 0,
                noonBreakStartDate.timeIntervalSince(noonBreakEndDate) < 0,
                noonBreakEndDate.timeIntervalSince(workEndDate) < 0
+            {
+                return true
+            } else {
+                return false
+            }
+        } else if isHaveNightBreak {
+            /*
+             if has Night Break
+             workStartDate < nightBreakStartDate
+             nightBreakStartDate < nightBreakEndDate
+             nightBreakEndDate < workEndDate
+             */
+            if workStartDate.timeIntervalSince(nightBreakStartDate) < 0,
+               nightBreakStartDate.timeIntervalSince(nightBreakEndDate) < 0,
+               nightBreakEndDate.timeIntervalSince(workEndDate) < 0
             {
                 return true
             } else {

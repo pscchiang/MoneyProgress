@@ -21,6 +21,15 @@
 "invalid_time_range_tip" = "Invalid time range";
 
 /* No comment provided by engineer. */
+"Is there a dinner break" = "Is there a dinner break";
+
+/* No comment provided by engineer. */
+"Dinner break ends at" = "Dinner break ends at ";
+
+/* No comment provided by engineer. */
+"Dinner break starts at " = "Dinner break starts at ";
+
+/* No comment provided by engineer. */
 "Is there a lunch break" = "Is there a lunch break";
 
 /* No comment provided by engineer. */
@@ -93,6 +102,9 @@
 
 /* No comment provided by engineer. */
 "Your effective working hours per day are %@ hours!" = "Your effective working hours per day are %@ hours!";
+
+/* No comment provided by engineer. */
+"Today's date:" = "Today's date: %@";
 
 /* No comment provided by engineer. */
 "💰" = "💰";
