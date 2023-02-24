@@ -86,11 +86,6 @@ struct ContentView: View {
     @State var sliderWidth: CGFloat = 0
     @State var dayWorkOfMonth: Int = 20
 
-<<<<<<< HEAD
-=======
-    @StateObject var menubar = Menubar.shared
-
->>>>>>> main
     @State private var isHaveNightBreak: Bool = false
     @State private var isHaveNoonBreak: Bool = false
     @State private var isShowAlert = false
